@@ -1,0 +1,7 @@
+transactions - do it yourself
+
+no support for JPA DDL generation
+
+extend dialects for views, sequences, time support- currently removed
+
+join tables - handle yourself
