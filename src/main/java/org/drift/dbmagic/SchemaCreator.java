@@ -183,7 +183,7 @@ public class SchemaCreator {
             useDefaultValue = (existingDefaultValue != null);
         }
 
-        if (isPostgre()) {
+        if (isPostgreSQL()) {
             String prefix = "alter table " + tableName + " alter column " + columnDescription.getName();
             if (useSize) {
                 StringBuilder sql = new StringBuilder(prefix + " type ");
@@ -251,7 +251,7 @@ public class SchemaCreator {
     }
 
     private void setCompressedStorage(TableDescription table, ColumnDescription columnDescription) {
-        if (columnDescription.isCompressed() && isPostgre()) {
+        if (columnDescription.isCompressed() && isPostgreSQL()) {
             String sql = "alter table " + table.getFullTableName() + " alter column " + columnDescription.getName() + " set storage external";
             template.execute(sql);
         }
@@ -275,7 +275,7 @@ public class SchemaCreator {
 
         sql.append(")");
 
-        if (isPostgre() && tableDescription.inherits()) {
+        if (isPostgreSQL() && tableDescription.inherits()) {
             sql.append(" inherits (" + tableDescription.getParentTableName() + ")");
         }
 
@@ -358,8 +358,8 @@ public class SchemaCreator {
         return columnSize;
     }
 
-    private boolean isPostgre() {
-        return DBType.getDbTypeByName(getDialectName()).isPostgre();
+    private boolean isPostgreSQL() {
+        return DBType.getDbTypeByName(getDialectName()).isPostgreSQL();
     }
 
     private boolean isOracle() {

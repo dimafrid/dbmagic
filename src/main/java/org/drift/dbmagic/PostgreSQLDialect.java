@@ -11,7 +11,7 @@ import java.util.*;
 /**
  * @author Dima Frid
  */
-public class PostgreDialect extends Dialect {
+public class PostgreSQLDialect extends Dialect {
 
     private static final EnumMap<ColumnType, String> TYPE_MAP = new EnumMap<ColumnType, String>(ColumnType.class);
 

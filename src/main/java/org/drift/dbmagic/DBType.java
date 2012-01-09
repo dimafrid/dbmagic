@@ -20,7 +20,7 @@ public enum DBType {
         return this == ORACLE;
     }
 
-    public boolean isPostgre() {
+    public boolean isPostgreSQL() {
         return this == POSTGRESQL;
     }
 

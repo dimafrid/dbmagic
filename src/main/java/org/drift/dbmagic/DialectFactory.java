@@ -10,7 +10,7 @@ public class DialectFactory {
 
     static {
         map.put(DBType.ORACLE, new OracleDialect());
-        map.put(DBType.POSTGRESQL, new PostgreDialect());
+        map.put(DBType.POSTGRESQL, new PostgreSQLDialect());
         map.put(DBType.H2, new H2Dialect());
     }
 
