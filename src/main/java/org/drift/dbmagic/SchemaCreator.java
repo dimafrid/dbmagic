@@ -24,6 +24,18 @@ public class SchemaCreator {
 
     private String dialectName;
 
+    public SchemaCreator() { }
+
+    public SchemaCreator(DataSource dataSource, String dialectName) {
+        this.dataSource = dataSource;
+        this.dialectName = dialectName;
+    }
+
+    public SchemaCreator(DataSource dataSource, DBType dialect) {
+        setDataSource(dataSource);
+        setDialectName(dialect);
+    }
+
     public List<TableDescription> createTablesFromJPA(Collection<Class<?>> classes) {
         Set<TableDescription> tables = new HashSet<TableDescription>();
         for (Class<?> clazz : classes) {
@@ -34,7 +46,7 @@ public class SchemaCreator {
                     TableDescription tableDescription = (TableDescription) method.invoke(clazz.newInstance());
                     tables.add(tableDescription);
                 } catch (Exception e) {
-                    log.error("Failed to retrieve table description for class: " + clazz, e);
+                    logError("Failed to retrieve table description for class: " + clazz, e);
                 }
             }
         }
@@ -49,7 +61,7 @@ public class SchemaCreator {
                 _createTable(table);
                 successful.add(table);
             } catch (Exception e) {
-                log.error("Failed to create or update table: " + table, e);
+                logError("Failed to create or update table: " + table, e);
             }
         }
 
@@ -70,8 +82,8 @@ public class SchemaCreator {
 
         if (!tableExists(tableName)) {
             String sql = composeTableCreationSql(tableDescription);
-            log.info("Creating table " + tableName);
-            template.execute(sql);
+            logInfo("Creating table " + tableName);
+            template().execute(sql);
 
             for (ColumnDescription column : tableDescription.getColumns().values()) {
                 setCompressedStorage(tableDescription, column);
@@ -83,11 +95,7 @@ public class SchemaCreator {
             updateTable(tableDescription);
         }
 
-        Collection<TableDescription> joinTablesDescriptions = tableDescription.getJoinTablesDescriptions();
-        if (joinTablesDescriptions == null) {
-            return;
-        }
-        for (TableDescription joinTableDescription : joinTablesDescriptions) {
+        for (TableDescription joinTableDescription : tableDescription.getJoinTablesDescriptions()) {
             _createTable(joinTableDescription);
         }
     }
@@ -98,7 +106,7 @@ public class SchemaCreator {
         }
 
         String tableName = tableDescription.getTableName();
-        Map<String, ColumnDescription> existingColumns = getDialect().getColumns(tableName, template);
+        Map<String, ColumnDescription> existingColumns = getDialect().getColumns(tableName, template());
         for (ColumnDescription columnDescription : tableDescription.getColumns().values()) {
             ColumnDescription existingColumn = existingColumns.get(columnDescription.getName());
             if (existingColumn != null) {
@@ -109,7 +117,7 @@ public class SchemaCreator {
             createColumn(tableDescription, columnDescription);
         }
 
-        Set<String> existingIndexes = getDialect().getIndexes(tableName, template);
+        Set<String> existingIndexes = getDialect().getIndexes(tableName, template());
         boolean newIndexFound = false;
         for (IndexDescription indexDescription : tableDescription.getIndexes()) {
             String requiredIndexName = SchemaUtil.composeIndexName(indexDescription, tableName);
@@ -124,7 +132,7 @@ public class SchemaCreator {
             createIndexes(tableDescription);
         }
 
-        String existingPK = getDialect().getPrimaryKey(tableName, template);
+        String existingPK = getDialect().getPrimaryKey(tableName, template());
         String pk = SchemaUtil.composePKName(tableName);
         if (existingPK != null && !pk.equalsIgnoreCase(existingPK)) {
             dropPK(existingPK, tableName);
@@ -133,9 +141,9 @@ public class SchemaCreator {
     }
 
     private void dropPK(String pkName, String tableName) {
-        log.info("Dropping constraint " + pkName);
+        logInfo("Dropping constraint " + pkName);
         String sql = "alter table " + tableName + " drop constraint " + pkName;
-        template.execute(sql);
+        template().execute(sql);
     }
 
     private boolean sameBooleanValues(String required, String fromDB) {
@@ -150,7 +158,7 @@ public class SchemaCreator {
         String required = getDialect().toMetadataType(columnDescription.getType());
         String actual = existingColumnDescription.getNativeType();
         if (!required.equalsIgnoreCase(actual)) {
-            log.error("Column type change [" + actual + " -> " + required + "] is not supported within the scope of schema upgrade");
+            logError("Column type change [" + actual + " -> " + required + "] is not supported within the scope of schema upgrade");
             return;
         }
 
@@ -162,13 +170,13 @@ public class SchemaCreator {
             useSize = false;
         } else {
             if (requiredSize > 0 && requiredSize < existingSize) {
-                log.info("size (" + existingSize + "->" + requiredSize + ") decrease is not supported; column [" + columnDescription + "]");
+                logInfo("size (" + existingSize + "->" + requiredSize + ") decrease is not supported; column [" + columnDescription + "]");
             }
             useSize = requiredSize > existingSize;
         }
 
         if (existingColumnDescription.isNullable() && !columnDescription.isNullable()) {
-            log.info("The constraint change (NULLABLE -> NOT NULLABLE) is unsupported; column [" + columnDescription + "]");
+            logInfo("The constraint change (NULLABLE -> NOT NULLABLE) is unsupported; column [" + columnDescription + "]");
         }
         boolean useConstraint = (!existingColumnDescription.isNullable() && columnDescription.isNullable());
 
@@ -192,14 +200,14 @@ public class SchemaCreator {
                 if (columnSize > 0) {
                     sql.append("(" + columnSize + ")");
                 }
-                template.execute(sql.toString());
-                log.info("Column [" + columnDescription.getName() + "] size updated to " + columnDescription.getSize());
+                template().execute(sql.toString());
+                logInfo("Column [" + columnDescription.getName() + "] size updated to " + columnDescription.getSize());
             }
 
             if (useConstraint) {
                 String sql = prefix + " drop not null";
-                template.execute(sql);
-                log.info("Column [" + columnDescription.getName() + "] nullable constraint dropped");
+                template().execute(sql);
+                logInfo("Column [" + columnDescription.getName() + "] nullable constraint dropped");
             }
 
             if (columnDescription.getType().equals(ColumnType.BOOLEAN)) {
@@ -209,20 +217,20 @@ public class SchemaCreator {
             if (useDefaultValue) {
                 if (defaultValue == null) {
                     String sql = prefix + " drop default";
-                    template.execute(sql);
-                    log.info("Column [" + columnDescription.getName() + "] default value dropped");
+                    template().execute(sql);
+                    logInfo("Column [" + columnDescription.getName() + "] default value dropped");
                 } else {
                     String sql = prefix + " set default '" + columnDescription.getDefaultValue() + "'";
-                    template.execute(sql);
-                    log.info("Column [" + columnDescription.getName() + "] default value updated to " + columnDescription.getDefaultValue());
+                    template().execute(sql);
+                    logInfo("Column [" + columnDescription.getName() + "] default value updated to " + columnDescription.getDefaultValue());
                 }
             }
         } else if (isOracle()) {
             if (useSize || useConstraint || useDefaultValue) {
                 String sql = "alter table " + tableName + " modify (" +
                              composeColumnSQL(tableName, columnDescription, useSize, useConstraint, useDefaultValue) + ")";
-                template.execute(sql);
-                log.info("Column updated: " + columnDescription);
+                template().execute(sql);
+                logInfo("Column updated: " + columnDescription);
             }
         }
     }
@@ -234,9 +242,9 @@ public class SchemaCreator {
     }
 
     private void dropIndex(String index, TableDescription tableDescription) {
-        log.info("Dropping index " + index);
+        logInfo("Dropping index " + index);
         if (indexExists(index, tableDescription.getTableName())) {
-            template.execute("drop index " + tableDescription.getFullIndexName(index));
+            template().execute("drop index " + tableDescription.getFullIndexName(index));
         }
     }
 
@@ -244,8 +252,8 @@ public class SchemaCreator {
         String tableName = table.getFullTableName();
         String columnSQL = composeColumnSQL(tableName, columnDescription, true);
         String sql = getDialect().getAddColumnStatement(tableName, columnSQL);
-        log.info("Creating column [" + columnDescription + "] in table [" + tableName + "]");
-        template.execute(sql);
+        logInfo("Creating column [" + columnDescription + "] in table [" + tableName + "]");
+        template().execute(sql);
 
         setCompressedStorage(table, columnDescription);
     }
@@ -253,7 +261,7 @@ public class SchemaCreator {
     private void setCompressedStorage(TableDescription table, ColumnDescription columnDescription) {
         if (columnDescription.isCompressed() && isPostgreSQL()) {
             String sql = "alter table " + table.getFullTableName() + " alter column " + columnDescription.getName() + " set storage external";
-            template.execute(sql);
+            template().execute(sql);
         }
     }
 
@@ -274,12 +282,6 @@ public class SchemaCreator {
         getDialect().addCheckConstraints(tableDescription, sql, comma);
 
         sql.append(")");
-
-        if (isPostgreSQL() && tableDescription.inherits()) {
-            sql.append(" inherits (" + tableDescription.getParentTableName() + ")");
-        }
-
-        sql.append(getDialect().engine());
 
         return sql.toString();
     }
@@ -366,19 +368,19 @@ public class SchemaCreator {
         return DBType.getDbTypeByName(getDialectName()).isOracle();
     }
 
-    public boolean tableExists(String tableName) {
-        return getDialect().tableExists(tableName, template);
+    boolean tableExists(String tableName) {
+        return getDialect().tableExists(tableName, template());
     }
 
-    public boolean indexExists(String indexName, String tableName) {
-        return getDialect().indexExists(indexName, tableName, template);
+    boolean indexExists(String indexName, String tableName) {
+        return getDialect().indexExists(indexName, tableName, template());
     }
 
     private Dialect getDialect() {
         return DialectFactory.getDialect(dialectName);
     }
 
-    public void createPrimaryKey(TableDescription tableDescription) {
+    private void createPrimaryKey(TableDescription tableDescription) {
         IndexDescription pk = tableDescription.getPrimaryKey();
         if (pk == null) {
             return;
@@ -387,7 +389,7 @@ public class SchemaCreator {
         String fullTableName = tableDescription.getFullTableName();
         String pkName = SchemaUtil.composePKName(tableDescription.getTableName());
 
-        log.info("Creating primary key [" + pkName + "] for table " + fullTableName);
+        logInfo("Creating primary key [" + pkName + "] for table " + fullTableName);
 
         if (getDialect().pkRequiresIndex()) {
             createIndex(fullTableName, pk, pkName);
@@ -397,7 +399,7 @@ public class SchemaCreator {
     }
 
     private void addPKConstraint(String tableName, IndexDescription primaryKey, String pkName) {
-        log.info("Adding PK constraint [" + pkName + "] for table " + tableName);
+        logInfo("Adding PK constraint [" + pkName + "] for table " + tableName);
 
         StringBuilder sql = new StringBuilder();
 
@@ -409,7 +411,7 @@ public class SchemaCreator {
         sql.append(appendColumnNames(primaryKey));
         sql.append(")");
 
-        template.execute(sql.toString());
+        template().execute(sql.toString());
     }
 
     private String appendColumnNames(IndexDescription indexDescription) {
@@ -429,16 +431,16 @@ public class SchemaCreator {
         }
     }
 
-    public void createIndex(TableDescription tableDescription, IndexDescription indexDescription) {
+    private void createIndex(TableDescription tableDescription, IndexDescription indexDescription) {
         String indexName = SchemaUtil.composeIndexName(indexDescription, tableDescription.getTableName());
         createIndex(tableDescription.getFullTableName(), indexDescription, indexName);
     }
 
-    public void createIndex(String tableName, IndexDescription indexDescription, String indexName) {
+    private void createIndex(String tableName, IndexDescription indexDescription, String indexName) {
         if (!indexExists(indexName, tableName)) {
             String sql = composeIndexCreationSql(indexDescription, indexName, tableName);
-            log.info("Creating " + indexName + " index [" + indexDescription + "] for table " + tableName);
-            template.execute(sql);
+            logInfo("Creating " + indexName + " index [" + indexDescription + "] for table " + tableName);
+            template().execute(sql);
         }
     }
 
@@ -455,7 +457,7 @@ public class SchemaCreator {
         sql.append(" on ").append(tableName);
         if (indexDescription.isLower()) {
             if (indexDescription.getColumnNames().size() != 1) {
-                log.error("Can't have lower flag on composite index. " + indexDescription);
+                logError("Can't have lower flag on composite index. " + indexDescription);
             } else {
                 String column = indexDescription.getColumnNames().iterator().next();
                 String index = getDialect().lowerIndex(column);
@@ -477,7 +479,62 @@ public class SchemaCreator {
         return sql.toString();
     }
 
-    public String getDialectName() {
+    String getDialectName() {
         return dialectName;
+    }
+
+    public void setDialectName(String dialectName) {
+        this.dialectName = dialectName;
+    }
+
+    public void setDialectName(DBType dbType) {
+        this.dialectName = dbType.toString();
+    }
+
+    private JdbcTemplate template() {
+        if (template != null) {
+            return template;
+        }
+
+        if (dataSource == null) {
+            throw new RuntimeException("Data source is not set");
+        }
+
+        template = new JdbcTemplate(dataSource);
+        return template;
+    }
+
+    public void setDataSource(DataSource dataSource) {
+        this.dataSource = dataSource;
+        template = null;
+    }
+
+    public void setLog(Logger log) {
+        this.log = log;
+        getDialect().setLog(log);
+    }
+
+    private void logDebug(String msg) {
+        if (log != null) {
+            log.debug(msg);
+        }
+    }
+
+    private void logInfo(String msg) {
+        if (log != null) {
+            log.info(msg);
+        }
+    }
+
+    private void logError(String msg) {
+        if (log != null) {
+            log.error(msg);
+        }
+    }
+
+    private void logError(String msg, Exception e) {
+        if (log != null) {
+            log.error(msg, e);
+        }
     }
 }

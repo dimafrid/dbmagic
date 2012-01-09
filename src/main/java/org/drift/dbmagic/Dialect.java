@@ -9,20 +9,13 @@ import java.util.*;
  * @author Dima Frid
  */
 public abstract class Dialect {
-    protected Logger log;
+    private Logger log;
 
     private static final int DEFAULT_STRING_COLUMN_SIZE = 50;
     private static final int MAX_STRING_COLUMN_SIZE = 4000;
     private static final int DEFAULT_NUMBER_COLUMN_SIZE = 11;
     private static final int DEFAULT_LONG_COLUMN_SIZE = 19;
     private static final int DEFAULT_RAW_COLUMN_SIZE = 16;
-
-    /**
-     * @return engine suffix for create table command (mainly for MySql)
-     */
-    public String engine() {
-        return "";
-    }
 
     public String toNativeType(ColumnType dbtype) {
         return getTypeMappings().get(dbtype);
@@ -57,10 +50,10 @@ public abstract class Dialect {
     public int getVarcharColumnSize(String tableName, String columnName, Integer requiredSize) {
         int actualSize;
         if (requiredSize == null || requiredSize == 0) {
-            log.debug("Column [" + tableName + "." + columnName + "] is of size 0; using " + DEFAULT_STRING_COLUMN_SIZE);
+            debug("Column [" + tableName + "." + columnName + "] is of size 0; using " + DEFAULT_STRING_COLUMN_SIZE);
             actualSize = DEFAULT_STRING_COLUMN_SIZE;
         } else if (requiredSize > MAX_STRING_COLUMN_SIZE) {
-            log.debug("Column [" + tableName + "." + columnName + "] is of size greater than " + MAX_STRING_COLUMN_SIZE +
+            debug("Column [" + tableName + "." + columnName + "] is of size greater than " + MAX_STRING_COLUMN_SIZE +
                      "; trimming to " + MAX_STRING_COLUMN_SIZE);
             actualSize = MAX_STRING_COLUMN_SIZE;
         } else {
@@ -115,5 +108,15 @@ public abstract class Dialect {
     }
 
     public void addCheckConstraints(TableDescription tableDescription, StringBuffer sql, String expressionSeparator) {
+    }
+
+    public void setLog(Logger log) {
+        this.log = log;
+    }
+
+    protected void debug(String msg) {
+        if (log != null) {
+            log.debug(msg);
+        }
     }
 }

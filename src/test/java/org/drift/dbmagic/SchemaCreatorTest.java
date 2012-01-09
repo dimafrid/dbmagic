@@ -1,12 +1,10 @@
 package org.drift.dbmagic;
 
+import org.junit.Before;
 import org.junit.Test;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
 import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.*;
@@ -15,23 +13,21 @@ import static org.junit.Assert.*;
  * @author Dima Frid
  */
 public class SchemaCreatorTest {
-    private static String ID_COL_NAME = "ID";
-    private static String ID1_COL_NAME = "ID1";
-    private static String INT_COL_NAME = "INT_COL";
-    private static String STR_COL_NAME = "STR_COL";
-    private static String STR1_COL_NAME = "STR1_COL";
-    private static String BOOL_COL_NAME = "BOOL_COL";
-    private static String TIME_COL_NAME = "TIME";
+    private static final String ID_COL_NAME = "ID";
+    private static final String ID1_COL_NAME = "ID1";
+    private static final String INT_COL_NAME = "INT_COL";
+    private static final String STR_COL_NAME = "STR_COL";
+    private static final String STR1_COL_NAME = "STR1_COL";
+    private static final String BOOL_COL_NAME = "BOOL_COL";
+
+    private static final String TEST_TABLE_NAME = "TST_TABLE";
 
     private SchemaCreator schemaCreator;
 
-    @PersistenceContext
-    private EntityManager entityManager;
-
-    private TstDBTable table = new TstDBTable() {
+    private DBTable table = new DBTable() {
         @Override
         public TableDescription tableDescription() {
-            TableDescription tableDescription = new TableDescription(TABLE_NAME);
+            TableDescription tableDescription = new TableDescription(TEST_TABLE_NAME);
 
             tableDescription.addColumn(ID_COL_NAME).ofType(ColumnType.ID).notNullable();
             tableDescription.addColumn(INT_COL_NAME).ofType(ColumnType.INTEGER).ofSize(5);
@@ -46,6 +42,28 @@ public class SchemaCreatorTest {
             return tableDescription;
         }
     };
+
+    @Before
+    public void be4() {
+        //setupPostgreSQL();
+        setupH2();
+    }
+
+    private void setupPostgreSQL() {
+        String url = "jdbc:postgresql:dbmagic";
+        String user = "dima";
+        String password = "dima";
+        DriverManagerDataSource ds = new DriverManagerDataSource(url, user, password);
+        schemaCreator = new SchemaCreator(ds, DBType.POSTGRESQL);
+    }
+
+    private void setupH2() {
+        String url = "jdbc:h2:mem:test;DB_CLOSE_DELAY\\=-1;MVCC\\=TRUE";
+        String user = "sa";
+        String password = "";
+        DriverManagerDataSource ds = new DriverManagerDataSource(url, user, password);
+        schemaCreator = new SchemaCreator(ds, DBType.H2);
+    }
 
     @Test
     public void testSimple() throws SQLException {
@@ -62,10 +80,10 @@ public class SchemaCreatorTest {
 
         schemaCreator.createTable(table);
 
-        TstDBTable table1 = new TstDBTable() {
+        DBTable table1 = new DBTable() {
             @Override
             public TableDescription tableDescription() {
-                TableDescription tableDescription = new TableDescription(TABLE_NAME);
+                TableDescription tableDescription = new TableDescription(TEST_TABLE_NAME);
 
                 tableDescription.addColumn(ID_COL_NAME).ofType(ColumnType.ID).notNullable();
                 tableDescription.addColumn(ID1_COL_NAME).ofType(ColumnType.ID).notNullable();
@@ -88,10 +106,10 @@ public class SchemaCreatorTest {
 
         validateTable(table1);
 
-        table1 = new TstDBTable() {
+        table1 = new DBTable() {
             @Override
             public TableDescription tableDescription() {
-                TableDescription tableDescription = new TableDescription(TABLE_NAME);
+                TableDescription tableDescription = new TableDescription(TEST_TABLE_NAME);
 
                 tableDescription.addColumn(ID_COL_NAME).ofType(ColumnType.ID).notNullable();
                 tableDescription.addColumn(ID1_COL_NAME).ofType(ColumnType.ID).notNullable();
@@ -113,22 +131,9 @@ public class SchemaCreatorTest {
         schemaCreator.createTable(table1);
 
         validateTable(table1);
-
-        // Test upgrade boolean with data
-        final TableDescription table2 = new TableDescription("bool_upgr");
-        table2.addColumn("id").ofType(ColumnType.ID);
-        DBTable dbTable = new DBTable() { public TableDescription tableDescription() { return table2; } };
-        schemaCreator.createTable(dbTable);
-        entityManager.createNativeQuery("insert into bool_upgr (id) values ('1')").executeUpdate();
-        table2.addColumn("boolcol1").ofType(ColumnType.BOOLEAN);
-        table2.addColumn("boolcol2").ofType(ColumnType.BOOLEAN).setDefaultValue("1");
-        schemaCreator.createTable(dbTable);
-        Object[] result = (Object[]) entityManager.createNativeQuery("select * from bool_upgr").getSingleResult();
-        assertFalse((Boolean) result[1]);        
-        assertTrue((Boolean) result[2]);        
     }
 
-    private void validateTable(TstDBTable table) {
+    private void validateTable(DBTable table) {
         TableDescription tableDescription = table.tableDescription();
         String tableName = tableDescription.getTableName();
 
@@ -145,18 +150,6 @@ public class SchemaCreatorTest {
             assertTrue(schemaCreator.indexExists(pkName, tableName));
         }
     }
-
-//    @Test
-//    public void testSchemaHash() {
-//        List<TableDescription> successful = schemaCreator.createTables(table.tableDescription(), new KeyValuePair().tableDescription());
-//        assertEquals(2, successful.size());
-//
-//        successful = schemaCreator.createTables(table.tableDescription(), new KeyValuePair().tableDescription());
-//        assertEquals(0, successful.size());
-//
-//        successful = schemaCreator.createTables(table.tableDescription(), new KeyValuePair().tableDescription());
-//        assertEquals(0, successful.size());
-//    }
 
     @Test
     public void testTableDescriptionCreationFromJPA() {

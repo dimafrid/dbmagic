@@ -18,7 +18,6 @@ public class TableDescription implements Serializable {
     private Collection<String> checks = new ArrayList<String>();
     private Collection<TableDescription> joinTablesDescriptions = new ArrayList<TableDescription>();
     private String schema;
-    private String parentTableName;
 
     public TableDescription(String tableName) {
         this(tableName, null);
@@ -149,19 +148,6 @@ public class TableDescription implements Serializable {
         for (String s : list) {
             out.println(s);
         }
-    }
-
-    public void inheritsFrom(String parentTableName) {
-        this.parentTableName = parentTableName;
-        setColumns(Collections.<String, ColumnDescription>emptyMap());
-    }
-
-    public String getParentTableName() {
-        return parentTableName;
-    }
-
-    public boolean inherits() {
-        return StringUtils.isNotEmpty(parentTableName);
     }
 
     public Collection<String> getChecks() {

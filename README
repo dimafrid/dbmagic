@@ -1,7 +1,63 @@
-transactions - do it yourself
+WHAT IS IT:
+SchemaCreator automatically creates and updates your schema. Based on meta-description of persistent entities, it:
+- creates tables with their columns, PK, indexes and some constraints
+- updates existing tables adding or updating columns, indexes etc.
 
-no support for JPA DDL generation
+These meta-descriptions (TableDescription) can be created by using TableDescriptionUtil.getTableDescription() for JPA entities or programatically for non-JPA entities.
 
-extend dialects for views, sequences, time support- currently removed
+It supports PostgreSQL and H2. Used to support Oracle too, but I stopped maintaining it a while ago. Guess that with minor effort
+it would work too.
 
-join tables - handle yourself
+You no longer have to maintain SQL scripts per DB or manually update the schema every time you work with a new SW version.
+
+EXAMPLE:
+//your persistent entity
+@Table(name = "Blog")
+public class Blog {
+    private static enum Status {
+        GOOD, BAD
+    }
+
+    @Id
+    public long id;
+
+    @Column
+    public String name;
+
+    @Lob
+    public String content;
+
+    @Column
+    public Timestamp lastUpdate;
+
+    @Column(name = "IS_ACTIVE")
+    public boolean active;
+
+    @Column
+    @Enumerated(EnumType.STRING)
+    public Status enumField;
+}
+
+//put the following in your server startup sequence
+    DriverManagerDataSource ds =
+        new DriverManagerDataSource("jdbc:postgresql:dbmagic", "foo", "bar"); // or whatever data source you're using
+
+    SchemaCreator schemaCreator = new SchemaCreator(ds, DBType.POSTGRESQL);
+
+    schemaCreator.createTables(Arrays.asList(TableDescriptionUtil.getTableDescription(Blog.class)));
+//end
+
+Also see tests for examples
+
+NOTICE THAT:
+I don't analyze JPA relations (OneToMany, ManyToMany). Use TableDescription.addJoinTableDescription() to declare them programatically.
+
+If you want logging, set the org.apache.log4j.Logger programatically.
+
+DDL's transaction support is database specific, so I let you decide whether schema creation should be transactional and
+to what extent.
+
+Tests are really scarse - I hope to write some more in the future. Moreover, running tests over PostgreSQL requires a setup,
+so the tests run over H2, but there is a connection section for PostgreSQL.
+
+N.B. You can extend schema creator and respective dialects to support more DDL stuff, like views, sequences, etc.
