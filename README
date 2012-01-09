@@ -5,10 +5,11 @@ SchemaCreator automatically creates and updates your schema. Based on meta-descr
 
 These meta-descriptions (TableDescription) can be created by using TableDescriptionUtil.getTableDescription() for JPA entities or programatically for non-JPA entities.
 
-It supports PostgreSQL and H2. Used to support Oracle too, but I stopped maintaining it a while ago. Guess that with minor effort
-it would work too.
+It supports PostgreSQL and H2. Used to support Oracle too, but I stopped maintaining it a while ago. Guess that with minor effort it would work too.
 
 You no longer have to maintain SQL scripts per DB or manually update the schema every time you work with a new SW version.
+
+Thanks to https://github.com/rimar for the original idea and massive contribution!
 
 EXAMPLE:
 //your persistent entity
@@ -44,7 +45,8 @@ public class Blog {
 
     SchemaCreator schemaCreator = new SchemaCreator(ds, DBType.POSTGRESQL);
 
-    schemaCreator.createTables(Arrays.asList(TableDescriptionUtil.getTableDescription(Blog.class)));
+    schemaCreator.createTables(
+        Arrays.asList(TableDescriptionUtil.getTableDescription(Blog.class)));
 //end
 
 Also see tests for examples
@@ -54,10 +56,8 @@ I don't analyze JPA relations (OneToMany, ManyToMany). Use TableDescription.addJ
 
 If you want logging, set the org.apache.log4j.Logger programatically.
 
-DDL's transaction support is database specific, so I let you decide whether schema creation should be transactional and
-to what extent.
+DDL's transaction support is database specific, so I let you decide whether schema creation should be transactional and to what extent.
 
-Tests are really scarse - I hope to write some more in the future. Moreover, running tests over PostgreSQL requires a setup,
-so the tests run over H2, but there is a connection section for PostgreSQL.
+Tests are really scarse - I hope to write some more in the future. Moreover, running tests over PostgreSQL requires a setup, so the tests run over H2, but there is a connection section for PostgreSQL.
 
 N.B. You can extend schema creator and respective dialects to support more DDL stuff, like views, sequences, etc.
